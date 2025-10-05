@@ -28,8 +28,8 @@ export default function RootNavigator() {
                     let iconName: keyof typeof Ionicons.glyphMap = 'home-outline';
                     if (route.name === 'Welcome') iconName = 'home-outline';
                     if (route.name === 'Track') iconName = 'golf';
-                    if (route.name === 'Pressure') iconName = 'stopwatch-outline';
                     if (route.name === 'Stats') iconName = 'bar-chart-outline';
+                    if (route.name === 'Pressure') iconName = 'stopwatch-outline';
                     if (route.name === 'Settings') iconName = 'settings-outline';
                     return <Ionicons name={iconName} size={size} color={color} />;
                 },
@@ -38,8 +38,8 @@ export default function RootNavigator() {
         >
             <Tab.Screen name="Welcome" component={WelcomeScreen} />
             <Tab.Screen name="Track" component={TrackSessionScreen} />
-            <Tab.Screen name="Pressure" component={PressureGameScreen} />
             <Tab.Screen name="Stats" component={StatsScreen} />
+            <Tab.Screen name="Pressure" component={PressureGameScreen} />
             <Tab.Screen name="Settings" component={SettingsScreen} />
         </Tab.Navigator>
     );

@@ -12,6 +12,8 @@ import {
     Platform,
     ScrollView,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import Animated, { FadeInUp } from "react-native-reanimated";
 
 const CLUBS = [
     "Driver",
@@ -44,12 +46,7 @@ export default function TrackSessionScreen() {
     const [impactPickerVisible, setImpactPickerVisible] = useState(false);
 
     const handleAddShot = async () => {
-        console.log("🟢 handleAddShot called!");
-
-        if (!carry) {
-            console.log("⚠️ Nincs carry érték, nem küldjük el");
-            return;
-        }
+        if (!carry) return;
 
         const shotData = {
             club,
@@ -66,12 +63,7 @@ export default function TrackSessionScreen() {
 
         try {
             const res = await saveShot(shotData);
-            console.log("📬 saveShot válasz:", res);
-
-            if (res?.error) console.log("❌ Shot mentés sikertelen:", res.error);
-            else console.log("✅ Shot mentve:", res);
-
-            // reset fields
+            console.log("✅ Shot saved:", res);
             setCarry("");
             setTotal("");
             setBallSpeed("");
@@ -81,93 +73,125 @@ export default function TrackSessionScreen() {
             setSpin("");
             setOfflineM("");
         } catch (err) {
-            console.error("💥 Hiba a saveShot alatt:", err);
+            console.error("💥 saveShot error:", err);
         }
     };
 
     return (
         <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : undefined}
-            className="flex-1 bg-neutral-950 px-5 pt-16 pb-5"
+            className="flex-1 bg-neutral-950"
         >
-            <ScrollView showsVerticalScrollIndicator={false}>
-                <Text className="text-2xl font-bold text-white mb-1">Track Shot</Text>
-                <Text className="text-neutral-400 mb-4">
-                    Enter your golf shot data below.
+            {/* Gradient header */}
+            <LinearGradient
+                colors={["#f59e0b", "#f97316", "#c2410c"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                className="px-6 pt-16 pb-10 rounded-b-3xl"
+            >
+                <Text className="text-white font-bold text-2xl mb-1 mt-10 pt-8 ml-4">Track Session</Text>
+                <Text className="text-emerald-100 text-sm ml-4">
+                    Log your shots and monitor your consistency.
                 </Text>
 
-                {/* Club selector */}
-                <TouchableOpacity
-                    className="bg-neutral-900 rounded-xl p-3 mb-3"
-                    onPress={() => setClubPickerVisible(true)}
-                >
-                    <Text className="text-xs text-neutral-400">Club</Text>
-                    <Text className="text-lg font-semibold text-white mt-1">{club}</Text>
-                </TouchableOpacity>
+                {/* Active club + impact summary */}
+                <View className="flex-row mt-6 space-x-4 justify-center gap-6 mb-4">
+                    <TouchableOpacity
+                        className="bg-white/20 border border-white/20 px-4 py-2 rounded-full"
+                        onPress={() => setClubPickerVisible(true)}
+                    >
+                        <Text className="text-white font-semibold">{club}</Text>
+                    </TouchableOpacity>
 
-                {/* Impact selector */}
-                <TouchableOpacity
-                    className="bg-neutral-900 rounded-xl p-3 mb-3"
-                    onPress={() => setImpactPickerVisible(true)}
-                >
-                    <Text className="text-xs text-neutral-400">Impact</Text>
-                    <Text className="text-lg font-semibold text-white mt-1">{impact}</Text>
-                </TouchableOpacity>
-
-                {/* Input fields */}
-                <View className="flex flex-col gap-3 mt-2">
-                    {[
-                        { label: "Carry (m)", value: carry, setter: setCarry },
-                        { label: "Total (m)", value: total, setter: setTotal },
-                        { label: "Ball Speed (km/h)", value: ballSpeed, setter: setBallSpeed },
-                        { label: "Club Speed (km/h)", value: clubSpeed, setter: setClubSpeed },
-                        { label: "Smash Factor", value: smash, setter: setSmash },
-                        { label: "Launch Angle (°)", value: launchDeg, setter: setLaunchDeg },
-                        { label: "Spin (rpm)", value: spin, setter: setSpin },
-                        { label: "Offline (m)", value: offlineM, setter: setOfflineM },
-                    ].map((f) => (
-                        <View key={f.label}>
-                            <Text className="text-neutral-400 mb-1">{f.label}</Text>
-                            <TextInput
-                                className="bg-neutral-900 text-white rounded-xl px-4 py-3"
-                                placeholder={f.label}
-                                placeholderTextColor="#666"
-                                keyboardType="numeric"
-                                value={f.value}
-                                onChangeText={f.setter}
-                            />
-                        </View>
-                    ))}
+                    <TouchableOpacity
+                        className="bg-white/10 border border-white/20 px-4 py-2 rounded-full"
+                        onPress={() => setImpactPickerVisible(true)}
+                    >
+                        <Text className="text-white font-semibold">{impact}</Text>
+                    </TouchableOpacity>
                 </View>
+            </LinearGradient>
 
-                {/* Add button */}
-                <TouchableOpacity
-                    onPress={handleAddShot}
-                    className="bg-emerald-500 rounded-2xl py-4 mt-6"
-                >
-                    <Text className="text-white font-bold text-lg text-center">Add Shot</Text>
-                </TouchableOpacity>
+            {/* Body */}
+            <ScrollView
+                className="flex-1 px-5 pt-6 pb-10"
+                showsVerticalScrollIndicator={false}
+            >
+                <Animated.View entering={FadeInUp.delay(200)}>
+                    <Text className="text-lg font-bold text-white mb-4">Shot Metrics</Text>
+
+                    <View className="flex flex-col gap-4">
+                        {[
+                            { label: "Carry (m)", value: carry, setter: setCarry },
+                            { label: "Total (m)", value: total, setter: setTotal },
+                            { label: "Ball Speed (km/h)", value: ballSpeed, setter: setBallSpeed },
+                            { label: "Club Speed (km/h)", value: clubSpeed, setter: setClubSpeed },
+                            { label: "Smash Factor", value: smash, setter: setSmash },
+                            { label: "Launch Angle (°)", value: launchDeg, setter: setLaunchDeg },
+                            { label: "Spin (rpm)", value: spin, setter: setSpin },
+                            { label: "Offline (m)", value: offlineM, setter: setOfflineM },
+                        ].map((f, index) => (
+                            <Animated.View
+                                key={f.label}
+                                entering={FadeInUp.delay(index * 50)}
+                                className="bg-neutral-900/90 border border-neutral-800 rounded-2xl p-4"
+                            >
+                                <Text className="text-neutral-400 mb-2 text-sm">{f.label}</Text>
+                                <TextInput
+                                    className="text-white text-lg font-semibold"
+                                    placeholder={f.label}
+                                    placeholderTextColor="#666"
+                                    keyboardType="numeric"
+                                    value={f.value}
+                                    onChangeText={f.setter}
+                                />
+                            </Animated.View>
+                        ))}
+                    </View>
+
+                    {/* Add Shot Button */}
+                    <TouchableOpacity
+                        onPress={handleAddShot}
+                        className="mt-8 rounded-2xl overflow-hidden"
+                        activeOpacity={0.8}
+                    >
+                        <LinearGradient
+                            colors={["#f59e0b", "#f97316"]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            className="py-4 mb-6"
+                        >
+                            <Text className="text-center text-white font-bold py-4 text-lg tracking-wide">
+                                Add Shot
+                            </Text>
+                        </LinearGradient>
+                    </TouchableOpacity>
+                </Animated.View>
             </ScrollView>
 
             {/* Club Picker */}
             <Modal visible={clubPickerVisible} animationType="slide" transparent>
                 <View className="flex-1 bg-black/60 justify-end">
-                    <View className="bg-neutral-900 p-5 rounded-t-2xl">
-                        <Text className="text-white text-lg font-bold mb-2">Select Club</Text>
+                    <View className="bg-neutral-900/95 p-5 rounded-t-2xl border-t border-neutral-800">
+                        <Text className="text-white text-lg font-bold mb-2 text-center">
+                            Select Club
+                        </Text>
                         {CLUBS.map((c) => (
                             <Pressable
                                 key={c}
-                                className="py-2"
+                                className="py-3 border-b border-neutral-800"
                                 onPress={() => {
                                     setClub(c);
                                     setClubPickerVisible(false);
                                 }}
                             >
-                                <Text className="text-white text-base">{c}</Text>
+                                <Text className="text-white text-center text-base">{c}</Text>
                             </Pressable>
                         ))}
                         <Pressable onPress={() => setClubPickerVisible(false)}>
-                            <Text className="text-emerald-400 text-center mt-3 font-bold">Cancel</Text>
+                            <Text className="text-emerald-400 text-center mt-4 font-bold">
+                                Cancel
+                            </Text>
                         </Pressable>
                     </View>
                 </View>
@@ -176,22 +200,26 @@ export default function TrackSessionScreen() {
             {/* Impact Picker */}
             <Modal visible={impactPickerVisible} animationType="slide" transparent>
                 <View className="flex-1 bg-black/60 justify-end">
-                    <View className="bg-neutral-900 p-5 rounded-t-2xl">
-                        <Text className="text-white text-lg font-bold mb-2">Impact Quality</Text>
+                    <View className="bg-neutral-900/95 p-5 rounded-t-2xl border-t border-neutral-800">
+                        <Text className="text-white text-lg font-bold mb-2 text-center">
+                            Impact Quality
+                        </Text>
                         {IMPACTS.map((i) => (
                             <Pressable
                                 key={i}
-                                className="py-2"
+                                className="py-3 border-b border-neutral-800"
                                 onPress={() => {
                                     setImpact(i);
                                     setImpactPickerVisible(false);
                                 }}
                             >
-                                <Text className="text-white text-base">{i}</Text>
+                                <Text className="text-white text-center text-base">{i}</Text>
                             </Pressable>
                         ))}
                         <Pressable onPress={() => setImpactPickerVisible(false)}>
-                            <Text className="text-emerald-400 text-center mt-3 font-bold">Cancel</Text>
+                            <Text className="text-emerald-400 text-center mt-4 font-bold">
+                                Cancel
+                            </Text>
                         </Pressable>
                     </View>
                 </View>

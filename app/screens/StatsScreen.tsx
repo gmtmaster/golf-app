@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
     View,
     Text,
@@ -8,9 +9,12 @@ import {
     ScrollView,
     ActivityIndicator,
     Dimensions,
+    RefreshControl,
 } from "react-native";
 import { getToken } from "../lib/secureStore";
 import { BarChart, LineChart } from "react-native-chart-kit";
+import { LinearGradient } from "expo-linear-gradient";
+import Animated, { FadeInUp } from "react-native-reanimated";
 
 export default function StatsScreen() {
     const [clubs, setClubs] = useState<string[]>([]);
@@ -18,31 +22,51 @@ export default function StatsScreen() {
     const [shots, setShots] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [pickerVisible, setPickerVisible] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
 
     const screenWidth = Dimensions.get("window").width - 40;
 
-    useEffect(() => {
-        const fetchData = async () => {
+    const fetchData = useCallback(async () => {
+        try {
+            setLoading(true);
             const token = await getToken();
 
-            // fetch clubs
-            const clubRes = await fetch("https://trackman-cloud.vercel.app/api/mobile/clubs", {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            const [clubRes, shotRes] = await Promise.all([
+                fetch("https://trackman-cloud.vercel.app/api/mobile/clubs", {
+                    headers: { Authorization: `Bearer ${token}` },
+                }),
+                fetch("https://trackman-cloud.vercel.app/api/mobile/shots", {
+                    headers: { Authorization: `Bearer ${token}` },
+                }),
+            ]);
+
             const clubData = await clubRes.json();
-            setClubs(clubData.clubs || []);
-
-            // fetch shots
-            const shotRes = await fetch("https://trackman-cloud.vercel.app/api/mobile/shots", {
-                headers: { Authorization: `Bearer ${token}` },
-            });
             const shotData = await shotRes.json();
-            setShots(shotData.shots || []);
-            setLoading(false);
-        };
 
-        fetchData();
+            setClubs(clubData.clubs || []);
+            setShots(shotData.shots || []);
+        } catch (err) {
+            console.error("❌ Error fetching stats:", err);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
     }, []);
+
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
+
+    useFocusEffect(
+        useCallback(() => {
+            fetchData();
+        }, [fetchData])
+    );
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        await fetchData();
+    }, [fetchData]);
 
     const filteredShots = useMemo(() => {
         if (!selectedClub) return [];
@@ -51,15 +75,12 @@ export default function StatsScreen() {
 
     const stats = useMemo(() => {
         if (filteredShots.length === 0) return null;
-
         const totals = filteredShots.map((s) => s.total || 0);
         const carries = filteredShots.map((s) => s.carry || 0);
-
         const avgTotal = (totals.reduce((a, b) => a + b, 0) / totals.length).toFixed(1);
         const avgCarry = (carries.reduce((a, b) => a + b, 0) / carries.length).toFixed(1);
         const max = Math.max(...totals);
         const min = Math.min(...totals);
-
         return { avgTotal, avgCarry, max, min, totals, carries };
     }, [filteredShots]);
 
@@ -77,42 +98,56 @@ export default function StatsScreen() {
     const chartConfig = {
         backgroundGradientFrom: "#171717",
         backgroundGradientTo: "#171717",
-        color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
+        color: (opacity = 1) => `rgba(255, 152, 0, ${opacity})`,
         labelColor: () => "#aaa",
         decimalPlaces: 0,
         barPercentage: 0.5,
-        propsForDots: {
-            r: "4",
-            strokeWidth: "2",
-            stroke: "#10b981",
-        },
+        propsForDots: { r: "4", strokeWidth: "2", stroke: "#FF7A00" },
     };
 
     return (
-        <View className="flex-1 bg-neutral-950 px-5 pt-16 pb-5">
+        <View className="flex-1 bg-neutral-950">
+            {/* Gradient Header */}
+            <LinearGradient
+                colors={["#f59e0b", "#f97316", "#c2410c"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                className="px-6 pt-16 pb-12 rounded-b-3xl"
+            >
+                <Text className="text-white font-bold text-2xl mb-1 mt-10 pt-8 ml-4">
+                    Session Stats
+                </Text>
+                <Text className="text-emerald-100 text-sm ml-4">
+                    Analyze your performance and consistency.
+                </Text>
+
+                {/* Club selector */}
+                <TouchableOpacity
+                    className="bg-white/20 border border-white/20 px-5 py-2 mb-4 rounded-full mt-6 self-center"
+                    onPress={() => setPickerVisible(true)}
+                >
+                    <Text className="text-white font-semibold">
+                        {selectedClub ? formatClubName(selectedClub) : "Select Club"}
+                    </Text>
+                </TouchableOpacity>
+            </LinearGradient>
+
             {loading ? (
                 <View className="flex-1 justify-center items-center">
                     <ActivityIndicator color="#10b981" size="large" />
                 </View>
             ) : (
-                <ScrollView showsVerticalScrollIndicator={false}>
-                    <Text className="text-2xl font-bold text-white mb-5">Session Stats</Text>
-
-                    {/* Club selector */}
-                    <TouchableOpacity
-                        className="bg-neutral-900 rounded-xl p-4 mb-6"
-                        onPress={() => setPickerVisible(true)}
-                    >
-                        <Text className="text-xs text-neutral-400">Club</Text>
-                        <Text className="text-lg font-semibold text-white mt-1">
-                            {selectedClub ? formatClubName(selectedClub) : "Select a Club"}
-                        </Text>
-                    </TouchableOpacity>
-
+                <ScrollView
+                    className="flex-1 px-5 pt-6 pb-12"
+                    showsVerticalScrollIndicator={false}
+                    refreshControl={
+                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#10b981" />
+                    }
+                >
                     {stats ? (
-                        <>
+                        <Animated.View entering={FadeInUp.delay(150)}>
                             {/* Stat cards */}
-                            <View className="flex-row justify-between mb-5">
+                            <View className="flex-row justify-between mb-6">
                                 {[
                                     { label: "AVG", value: `${stats.avgTotal}m` },
                                     { label: "MAX", value: `${stats.max}m` },
@@ -120,7 +155,7 @@ export default function StatsScreen() {
                                 ].map((item) => (
                                     <View
                                         key={item.label}
-                                        className="bg-neutral-900 rounded-2xl p-4 flex-1 mx-1 items-center"
+                                        className="bg-neutral-900/90 border border-neutral-800 rounded-2xl p-4 flex-1 mx-1 items-center shadow-sm shadow-black/40"
                                     >
                                         <Text className="text-neutral-400 text-xs mb-1">{item.label}</Text>
                                         <Text className="text-white text-xl font-bold">{item.value}</Text>
@@ -128,8 +163,8 @@ export default function StatsScreen() {
                                 ))}
                             </View>
 
-                            {/* Distance distribution */}
-                            <View className="bg-neutral-900 rounded-2xl p-4 mb-6">
+                            {/* Distance Trend */}
+                            <View className="bg-neutral-900/90 border border-neutral-800 rounded-2xl p-4 mb-6 shadow-sm shadow-black/40">
                                 <Text className="text-white font-semibold mb-3 text-lg">
                                     Shot Distance Trend
                                 </Text>
@@ -147,8 +182,8 @@ export default function StatsScreen() {
                                 />
                             </View>
 
-                            {/* Carry vs Total Comparison */}
-                            <View className="bg-neutral-900 rounded-2xl p-4 mb-6">
+                            {/* Carry vs Total */}
+                            <View className="bg-neutral-900/90 border border-neutral-800 rounded-2xl p-4 mb-6 shadow-sm shadow-black/40">
                                 <Text className="text-white font-semibold mb-3 text-lg">
                                     Carry vs Total Averages
                                 </Text>
@@ -172,8 +207,8 @@ export default function StatsScreen() {
                                 />
                             </View>
 
-                            {/* Consistency Score */}
-                            <View className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 mb-4">
+                            {/* Consistency */}
+                            <View className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 mb-6 shadow-sm shadow-black/30">
                                 <Text className="text-emerald-400 font-semibold">
                                     Consistency Score:{" "}
                                     <Text className="text-white">
@@ -190,7 +225,7 @@ export default function StatsScreen() {
                             </View>
 
                             {/* Recent shots */}
-                            <View className="bg-neutral-900 rounded-2xl p-4 mb-8">
+                            <View className="bg-neutral-900/90 border border-neutral-800 rounded-2xl p-4 mb-8 shadow-sm shadow-black/40">
                                 <Text className="text-white font-semibold mb-3 text-lg">
                                     Last Shots ({filteredShots.length})
                                 </Text>
@@ -207,9 +242,9 @@ export default function StatsScreen() {
                                     </View>
                                 ))}
                             </View>
-                        </>
+                        </Animated.View>
                     ) : (
-                        <Text className="text-neutral-500 text-center mt-10">
+                        <Text className="text-neutral-500 text-center mt-20">
                             {selectedClub
                                 ? "No shots recorded yet for this club."
                                 : "Select a club to view stats."}
@@ -218,25 +253,31 @@ export default function StatsScreen() {
                 </ScrollView>
             )}
 
-            {/* Club picker */}
+            {/* Club Picker */}
             <Modal visible={pickerVisible} animationType="slide" transparent>
                 <View className="flex-1 bg-black/60 justify-end">
-                    <View className="bg-neutral-900 p-5 rounded-t-2xl">
-                        <Text className="text-white text-lg font-bold mb-2">Select Club</Text>
+                    <View className="bg-neutral-900/95 p-5 rounded-t-2xl border-t border-neutral-800">
+                        <Text className="text-white text-lg font-bold mb-2 text-center">
+                            Select Club
+                        </Text>
                         {clubs.map((c) => (
                             <Pressable
                                 key={c}
-                                className="py-2"
+                                className="py-3 border-b border-neutral-800"
                                 onPress={() => {
                                     setSelectedClub(c);
                                     setPickerVisible(false);
                                 }}
                             >
-                                <Text className="text-white text-base">{formatClubName(c)}</Text>
+                                <Text className="text-white text-center text-base">
+                                    {formatClubName(c)}
+                                </Text>
                             </Pressable>
                         ))}
                         <Pressable onPress={() => setPickerVisible(false)}>
-                            <Text className="text-emerald-400 text-center mt-3 font-bold">Cancel</Text>
+                            <Text className="text-emerald-400 text-center mt-4 font-bold">
+                                Cancel
+                            </Text>
                         </Pressable>
                     </View>
                 </View>
